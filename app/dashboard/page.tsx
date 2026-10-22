@@ -38,11 +38,11 @@ function CustomDropdown({
       <label className="block text-sm font-semibold text-slate-300 mb-2">
         {label} {required && '*'}
       </label>
-      <div ref={dropdownRef} className="relative">
+      <div ref={dropdownRef} className="relative z-[9999]">
         <button
           onClick={() => setIsOpen(!isOpen)}
           type="button"
-          className="w-full bg-white/5 border border-slate-600/30 rounded-xl px-4 py-3 text-white outline-none focus:border-cyan-500/50 focus:shadow-lg focus:shadow-cyan-500/10 transition-all duration-300 hover:bg-white/10 flex items-center justify-between"
+          className="w-full bg-white/5 border border-slate-600/30 rounded-xl px-4 py-3 text-white outline-none focus:border-cyan-500/50 focus:shadow-lg focus:shadow-cyan-500/10 transition-all duration-300 hover:bg-white/10 flex items-center justify-between will-change-transform"
         >
           <span>{value}</span>
           <ChevronDown
@@ -53,7 +53,13 @@ function CustomDropdown({
         </button>
 
         {isOpen && (
-          <div className="absolute top-full left-0 right-0 mt-2 bg-gradient-to-b from-slate-800 to-slate-900 border border-slate-700/50 rounded-xl shadow-2xl backdrop-blur-xl z-50 overflow-hidden">
+          <div className="fixed bg-gradient-to-b from-slate-800 to-slate-900 border border-slate-700/50 rounded-xl shadow-2xl backdrop-blur-xl z-[10000] overflow-hidden" style={{
+            top: `${(dropdownRef.current?.getBoundingClientRect().bottom || 0) + 8}px`,
+            left: `${dropdownRef.current?.getBoundingClientRect().left || 0}px`,
+            width: `${dropdownRef.current?.getBoundingClientRect().width || 0}px`,
+            maxHeight: '200px',
+            overflowY: 'auto'
+          }}>
             {options.map((option) => (
               <button
                 key={option}
@@ -334,14 +340,14 @@ export default function DashboardPage() {
           <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => setShowModal(false)}></div>
 
           {/* Modal */}
-          <div className="relative bg-gradient-to-br from-slate-900 via-slate-950 to-black border border-slate-700/50 rounded-2xl shadow-2xl w-full max-w-lg backdrop-blur-xl">
+          <div className="relative bg-gradient-to-br from-slate-900 via-slate-950 to-black border border-slate-700/50 rounded-2xl shadow-2xl w-full max-w-lg backdrop-blur-xl flex flex-col max-h-[90vh]">
             {/* Header */}
-            <div className="flex items-center justify-between p-8 border-b border-slate-700/50">
+            <div className="flex items-center justify-between p-8 border-b border-slate-700/50 flex-shrink-0">
               <div>
                 <h2 className="text-2xl font-bold text-white">Create New Data Flow</h2>
                 <p className="text-slate-400 text-sm mt-1">Configure source, destination, and security settings</p>
               </div>
-              <button onClick={() => setShowModal(false)} className="text-slate-400 hover:text-white transition">
+              <button onClick={() => setShowModal(false)} className="text-slate-400 hover:text-white transition flex-shrink-0">
                 <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                 </svg>
@@ -349,7 +355,7 @@ export default function DashboardPage() {
             </div>
 
             {/* Form */}
-            <form onSubmit={handleCreateFlow} className="p-8 space-y-6">
+            <form id="modal-form" onSubmit={handleCreateFlow} className="p-8 space-y-6 overflow-y-auto flex-1">
               {error && (
                 <div className="p-4 rounded-lg bg-red-500/10 border border-red-500/30 backdrop-blur-sm">
                   <p className="text-red-300 text-sm">{error}</p>
@@ -415,35 +421,37 @@ export default function DashboardPage() {
                 </div>
               </div>
 
-              {/* Buttons */}
-              <div className="flex gap-3 pt-6 border-t border-slate-700/50">
-                <button
-                  type="button"
-                  onClick={() => setShowModal(false)}
-                  className="flex-1 px-4 py-3 bg-slate-800 hover:bg-slate-700 text-white font-semibold rounded-lg transition-all duration-300 border border-slate-600 hover:border-slate-500"
-                  disabled={submitting}
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  className="flex-1 px-4 py-3 bg-gradient-to-r from-cyan-500 to-blue-500 hover:from-cyan-600 hover:to-blue-600 text-white font-semibold rounded-lg transition-all duration-300 shadow-lg hover:shadow-cyan-500/30 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-                  disabled={submitting}
-                >
-                  {submitting ? (
-                    <>
-                      <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
-                      Creating...
-                    </>
-                  ) : (
-                    <>
-                      <Plus className="w-5 h-5" />
-                      Create Flow
-                    </>
-                  )}
-                </button>
-              </div>
             </form>
+
+            {/* Buttons - Sticky Footer */}
+            <div className="flex gap-3 p-8 border-t border-slate-700/50 flex-shrink-0 bg-gradient-to-t from-slate-950 to-transparent">
+              <button
+                type="button"
+                onClick={() => setShowModal(false)}
+                className="flex-1 px-4 py-3 bg-slate-800 hover:bg-slate-700 text-white font-semibold rounded-lg transition-all duration-300 border border-slate-600 hover:border-slate-500"
+                disabled={submitting}
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                form="modal-form"
+                className="flex-1 px-4 py-3 bg-gradient-to-r from-cyan-500 to-blue-500 hover:from-cyan-600 hover:to-blue-600 text-white font-semibold rounded-lg transition-all duration-300 shadow-lg hover:shadow-cyan-500/30 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                disabled={submitting}
+              >
+                {submitting ? (
+                  <>
+                    <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+                    Creating...
+                  </>
+                ) : (
+                  <>
+                    <Plus className="w-5 h-5" />
+                    Create Flow
+                  </>
+                )}
+              </button>
+            </div>
           </div>
         </div>
       )}
