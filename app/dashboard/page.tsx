@@ -38,11 +38,11 @@ function CustomDropdown({
       <label className="block text-sm font-semibold text-slate-300 mb-2">
         {label} {required && '*'}
       </label>
-      <div ref={dropdownRef} className="relative z-[9999]">
+      <div ref={dropdownRef} className="relative">
         <button
           onClick={() => setIsOpen(!isOpen)}
           type="button"
-          className="w-full bg-white/5 border border-slate-600/30 rounded-xl px-4 py-3 text-white outline-none focus:border-cyan-500/50 focus:shadow-lg focus:shadow-cyan-500/10 transition-all duration-300 hover:bg-white/10 flex items-center justify-between will-change-transform"
+          className="w-full bg-white/5 border border-slate-600/30 rounded-xl px-4 py-3 text-white outline-none focus:border-cyan-500/50 focus:shadow-lg focus:shadow-cyan-500/10 transition-all duration-300 hover:bg-white/10 flex items-center justify-between"
         >
           <span>{value}</span>
           <ChevronDown
@@ -53,13 +53,7 @@ function CustomDropdown({
         </button>
 
         {isOpen && (
-          <div className="fixed bg-gradient-to-b from-slate-800 to-slate-900 border border-slate-700/50 rounded-xl shadow-2xl backdrop-blur-xl z-[10000] overflow-hidden" style={{
-            top: `${(dropdownRef.current?.getBoundingClientRect().bottom || 0) + 8}px`,
-            left: `${dropdownRef.current?.getBoundingClientRect().left || 0}px`,
-            width: `${dropdownRef.current?.getBoundingClientRect().width || 0}px`,
-            maxHeight: '200px',
-            overflowY: 'auto'
-          }}>
+          <div className="absolute top-full left-0 right-0 mt-2 bg-gradient-to-b from-slate-800 to-slate-900 border border-slate-700/50 rounded-xl shadow-2xl backdrop-blur-xl z-50 overflow-hidden">
             {options.map((option) => (
               <button
                 key={option}
@@ -100,15 +94,6 @@ export default function DashboardPage() {
   const [flows, setFlows] = useState<DataFlow[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const [showModal, setShowModal] = useState(false);
-  const [formData, setFormData] = useState({
-    name: '',
-    description: '',
-    source_type: 'CSV',
-    destination_type: 'Database',
-    encryption_enabled: true,
-  });
-  const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
     const fetchFlows = async () => {
@@ -151,60 +136,6 @@ export default function DashboardPage() {
     router.push('/login');
   };
 
-  const handleCreateFlow = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setSubmitting(true);
-
-    try {
-      const token = localStorage.getItem('access_token');
-
-      // Parse JWT to get user ID
-      const tokenParts = token?.split('.') || [];
-      const decodedToken = tokenParts[1] ? JSON.parse(atob(tokenParts[1])) : null;
-      const userId = decodedToken?.sub;
-
-      if (!userId) {
-        throw new Error('User ID not found in token');
-      }
-
-      const payload = {
-        ...formData,
-        created_by: userId,
-        source_config: {},
-        destination_config: {},
-      };
-
-      const response = await fetch('http://localhost:8000/api/data-flows', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`,
-        },
-        body: JSON.stringify(payload),
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.detail || 'Failed to create flow');
-      }
-
-      const newFlow = await response.json();
-      setFlows([...flows, newFlow]);
-      setShowModal(false);
-      setFormData({
-        name: '',
-        description: '',
-        source_type: 'CSV',
-        destination_type: 'Database',
-        encryption_enabled: true,
-      });
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to create flow');
-    } finally {
-      setSubmitting(false);
-    }
-  };
-
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'active':
@@ -230,7 +161,7 @@ export default function DashboardPage() {
             <h1 className="text-2xl font-bold text-white">Secure Flow</h1>
           </div>
           <div className="flex items-center gap-4">
-            <button onClick={() => setShowModal(true)} className="inline-flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-cyan-500 to-blue-500 hover:from-cyan-600 hover:to-blue-600 text-white font-semibold rounded-lg transition-all duration-300 shadow-lg hover:shadow-cyan-500/30">
+            <button onClick={() => router.push('/dashboard/create')} className="inline-flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-cyan-500 to-blue-500 hover:from-cyan-600 hover:to-blue-600 text-white font-semibold rounded-lg transition-all duration-300 shadow-lg hover:shadow-cyan-500/30">
               <Plus className="w-5 h-5" />
               New Flow
             </button>
@@ -266,7 +197,7 @@ export default function DashboardPage() {
             <p className="text-slate-400 text-lg mb-8 max-w-md mx-auto">
               Create your first secure data flow to get started. Configure sources, destinations, and encryption settings.
             </p>
-            <button onClick={() => setShowModal(true)} className="inline-flex items-center gap-2 px-8 py-4 bg-gradient-to-r from-cyan-500 to-blue-500 hover:from-cyan-600 hover:to-blue-600 text-white font-semibold rounded-xl transition-all duration-300 shadow-lg hover:shadow-cyan-500/30 text-lg">
+            <button onClick={() => router.push('/dashboard/create')} className="inline-flex items-center gap-2 px-8 py-4 bg-gradient-to-r from-cyan-500 to-blue-500 hover:from-cyan-600 hover:to-blue-600 text-white font-semibold rounded-xl transition-all duration-300 shadow-lg hover:shadow-cyan-500/30 text-lg">
               Create Your First Flow
               <ArrowRight className="w-5 h-5" />
             </button>
@@ -333,128 +264,6 @@ export default function DashboardPage() {
         )}
       </main>
 
-      {/* Modal Overlay */}
-      {showModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-          {/* Backdrop */}
-          <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => setShowModal(false)}></div>
-
-          {/* Modal */}
-          <div className="relative bg-gradient-to-br from-slate-900 via-slate-950 to-black border border-slate-700/50 rounded-2xl shadow-2xl w-full max-w-lg backdrop-blur-xl flex flex-col max-h-[90vh]">
-            {/* Header */}
-            <div className="flex items-center justify-between p-8 border-b border-slate-700/50 flex-shrink-0">
-              <div>
-                <h2 className="text-2xl font-bold text-white">Create New Data Flow</h2>
-                <p className="text-slate-400 text-sm mt-1">Configure source, destination, and security settings</p>
-              </div>
-              <button onClick={() => setShowModal(false)} className="text-slate-400 hover:text-white transition flex-shrink-0">
-                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                </svg>
-              </button>
-            </div>
-
-            {/* Form */}
-            <form id="modal-form" onSubmit={handleCreateFlow} className="p-8 space-y-6 overflow-y-auto flex-1">
-              {error && (
-                <div className="p-4 rounded-lg bg-red-500/10 border border-red-500/30 backdrop-blur-sm">
-                  <p className="text-red-300 text-sm">{error}</p>
-                </div>
-              )}
-
-              {/* Flow Name */}
-              <div>
-                <label className="block text-sm font-semibold text-slate-300 mb-2">Flow Name *</label>
-                <input
-                  type="text"
-                  placeholder="e.g., Customer Data Sync"
-                  value={formData.name}
-                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                  required
-                  className="w-full bg-white/5 border border-slate-600/30 rounded-xl px-4 py-3 text-white placeholder:text-slate-600 outline-none focus:border-cyan-500/50 focus:shadow-lg focus:shadow-cyan-500/10 transition-all duration-300"
-                />
-              </div>
-
-              {/* Description */}
-              <div>
-                <label className="block text-sm font-semibold text-slate-300 mb-2">Description</label>
-                <textarea
-                  placeholder="Describe what this data flow does..."
-                  value={formData.description}
-                  onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                  className="w-full bg-white/5 border border-slate-600/30 rounded-xl px-4 py-3 text-white placeholder:text-slate-600 outline-none focus:border-cyan-500/50 focus:shadow-lg focus:shadow-cyan-500/10 transition-all duration-300 resize-none h-24"
-                />
-              </div>
-
-              {/* Source & Destination */}
-              <div className="grid grid-cols-2 gap-4">
-                <CustomDropdown
-                  label="Source Type"
-                  value={formData.source_type}
-                  onChange={(value) => setFormData({ ...formData, source_type: value })}
-                  options={['CSV', 'API', 'Database', 'S3']}
-                  required
-                />
-                <CustomDropdown
-                  label="Destination Type"
-                  value={formData.destination_type}
-                  onChange={(value) => setFormData({ ...formData, destination_type: value })}
-                  options={['Database', 'API', 'CSV', 'S3']}
-                  required
-                />
-              </div>
-
-              {/* Encryption */}
-              <div className="flex items-center gap-3 p-4 rounded-xl bg-cyan-500/5 border border-cyan-500/20">
-                <input
-                  type="checkbox"
-                  id="encryption"
-                  checked={formData.encryption_enabled}
-                  onChange={(e) => setFormData({ ...formData, encryption_enabled: e.target.checked })}
-                  className="w-5 h-5 rounded accent-cyan-500 cursor-pointer"
-                />
-                <div className="flex-1">
-                  <label htmlFor="encryption" className="text-sm font-semibold text-white cursor-pointer">
-                    Enable Encryption
-                  </label>
-                  <p className="text-xs text-slate-400 mt-0.5">Recommended for sensitive data</p>
-                </div>
-              </div>
-
-            </form>
-
-            {/* Buttons - Sticky Footer */}
-            <div className="flex gap-3 p-8 border-t border-slate-700/50 flex-shrink-0 bg-gradient-to-t from-slate-950 to-transparent">
-              <button
-                type="button"
-                onClick={() => setShowModal(false)}
-                className="flex-1 px-4 py-3 bg-slate-800 hover:bg-slate-700 text-white font-semibold rounded-lg transition-all duration-300 border border-slate-600 hover:border-slate-500"
-                disabled={submitting}
-              >
-                Cancel
-              </button>
-              <button
-                type="submit"
-                form="modal-form"
-                className="flex-1 px-4 py-3 bg-gradient-to-r from-cyan-500 to-blue-500 hover:from-cyan-600 hover:to-blue-600 text-white font-semibold rounded-lg transition-all duration-300 shadow-lg hover:shadow-cyan-500/30 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-                disabled={submitting}
-              >
-                {submitting ? (
-                  <>
-                    <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
-                    Creating...
-                  </>
-                ) : (
-                  <>
-                    <Plus className="w-5 h-5" />
-                    Create Flow
-                  </>
-                )}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }
