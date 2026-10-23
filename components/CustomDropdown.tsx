@@ -1,74 +1,71 @@
 'use client';
 
-import { useState, useRef, useEffect } from 'react';
-import { ChevronDown } from 'lucide-react';
+import { useCallback, useState } from 'react';
+import { Check, ChevronDown } from 'lucide-react';
+import { cx, useClickOutside } from '@/components/ui';
+
+export type DropdownOption = string | { value: string; label: string; description?: string };
 
 interface CustomDropdownProps {
-  label: string;
+  label?: string;
   value: string;
   onChange: (value: string) => void;
-  options: string[];
+  options: DropdownOption[];
   required?: boolean;
+  ariaLabel?: string;
+  className?: string;
 }
 
-export default function CustomDropdown({
-  label,
-  value,
-  onChange,
-  options,
-  required = false,
-}: CustomDropdownProps) {
+const normalize = (o: DropdownOption) => (typeof o === 'string' ? { value: o, label: o } : o);
+
+export default function CustomDropdown({ label, value, onChange, options, required = false, ariaLabel, className }: CustomDropdownProps) {
   const [isOpen, setIsOpen] = useState(false);
-  const dropdownRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
-        setIsOpen(false);
-      }
-    };
-
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, []);
+  const close = useCallback(() => setIsOpen(false), []);
+  const ref = useClickOutside<HTMLDivElement>(close);
+  const items = options.map(normalize);
+  const selected = items.find((o) => o.value === value);
 
   return (
-    <div>
-      <label className="block text-sm font-semibold text-slate-300 mb-2">
-        {label} {required && '*'}
-      </label>
-      <div ref={dropdownRef} className="relative">
+    <div className={className}>
+      {label && (
+        <label className="mb-1.5 block text-sm font-medium text-slate-200">
+          {label}
+          {required && <span className="ml-0.5 text-sky-400">*</span>}
+        </label>
+      )}
+      <div ref={ref} className="relative">
         <button
-          onClick={() => setIsOpen(!isOpen)}
           type="button"
-          className="w-full bg-white/5 border border-slate-600/30 rounded-xl px-4 py-3 text-white outline-none focus:border-cyan-500/50 focus:shadow-lg focus:shadow-cyan-500/10 transition-all duration-300 hover:bg-white/10 flex items-center justify-between"
+          aria-haspopup="listbox"
+          aria-expanded={isOpen}
+          aria-label={ariaLabel ?? label}
+          onClick={() => setIsOpen(!isOpen)}
+          onKeyDown={(e) => e.key === 'Escape' && setIsOpen(false)}
+          className={cx(
+            'flex h-9 w-full items-center justify-between gap-2 rounded-lg border bg-slate-950/60 px-3 text-sm text-slate-100 outline-none transition-colors',
+            isOpen ? 'border-sky-500 ring-2 ring-sky-500/20' : 'border-slate-700 hover:border-slate-600'
+          )}
         >
-          <span>{value}</span>
-          <ChevronDown
-            className={`w-5 h-5 text-slate-400 transition-transform duration-300 ${
-              isOpen ? 'rotate-180' : ''
-            }`}
-          />
+          <span className="truncate">{selected?.label ?? value}</span>
+          <ChevronDown className={cx('h-4 w-4 shrink-0 text-slate-400 transition-transform', isOpen && 'rotate-180')} />
         </button>
 
-        {/* Dropdown Menu */}
         {isOpen && (
-          <div className="absolute top-full left-0 right-0 mt-2 bg-gradient-to-b from-slate-800 to-slate-900 border border-slate-700/50 rounded-xl shadow-2xl backdrop-blur-xl z-50 overflow-hidden">
-            {options.map((option) => (
+          <div role="listbox" className="absolute left-0 right-0 top-full z-50 mt-1.5 max-h-72 overflow-auto rounded-lg border border-slate-700 bg-slate-900 py-1 shadow-xl shadow-black/40">
+            {items.map((option) => (
               <button
-                key={option}
+                key={option.value}
+                type="button"
+                role="option"
+                aria-selected={value === option.value}
                 onClick={() => {
-                  onChange(option);
+                  onChange(option.value);
                   setIsOpen(false);
                 }}
-                type="button"
-                className={`w-full px-4 py-3 text-left text-sm font-medium transition-all duration-200 ${
-                  value === option
-                    ? 'bg-cyan-500/20 text-cyan-300 border-l-2 border-l-cyan-500'
-                    : 'text-slate-300 hover:bg-white/10 hover:text-white'
-                }`}
+                className={cx('flex w-full items-center justify-between gap-2 px-3 py-2 text-left text-sm transition-colors', value === option.value ? 'bg-sky-500/10 text-sky-200' : 'text-slate-200 hover:bg-slate-800')}
               >
-                {option}
+                <span className="truncate">{option.label}</span>
+                {value === option.value && <Check className="h-4 w-4 shrink-0" />}
               </button>
             ))}
           </div>

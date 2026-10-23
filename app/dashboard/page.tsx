@@ -1,269 +1,201 @@
 'use client';
 
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { ArrowRight, Shield, Plus, LogOut, Zap, ChevronDown } from 'lucide-react';
+import { ArrowRight, ChevronRight, Lock, Unlock, Plus, Search, Workflow } from 'lucide-react';
+import AppShell from '@/components/AppShell';
+import CustomDropdown from '@/components/CustomDropdown';
+import { Card, EmptyState, Notice, PageHeader, Skeleton, Stat, StatusBadge, Tag, buttonClass } from '@/components/ui';
+import { api, AuthRequiredError, hasSession, parseUtc, type DataFlow } from '@/lib/api';
+import { SOURCE_TYPES, STATUS_LABELS, relativeTime } from '@/lib/ui';
 
-// Custom Dropdown Component
-function CustomDropdown({
-  label,
-  value,
-  onChange,
-  options,
-  required = false,
-}: {
-  label: string;
-  value: string;
-  onChange: (value: string) => void;
-  options: string[];
-  required?: boolean;
-}) {
-  const [isOpen, setIsOpen] = useState(false);
-  const dropdownRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
-        setIsOpen(false);
-      }
-    };
-
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, []);
-
-  return (
-    <div>
-      <label className="block text-sm font-semibold text-slate-300 mb-2">
-        {label} {required && '*'}
-      </label>
-      <div ref={dropdownRef} className="relative">
-        <button
-          onClick={() => setIsOpen(!isOpen)}
-          type="button"
-          className="w-full bg-white/5 border border-slate-600/30 rounded-xl px-4 py-3 text-white outline-none focus:border-cyan-500/50 focus:shadow-lg focus:shadow-cyan-500/10 transition-all duration-300 hover:bg-white/10 flex items-center justify-between"
-        >
-          <span>{value}</span>
-          <ChevronDown
-            className={`w-5 h-5 text-slate-400 transition-transform duration-300 ${
-              isOpen ? 'rotate-180' : ''
-            }`}
-          />
-        </button>
-
-        {isOpen && (
-          <div className="absolute top-full left-0 right-0 mt-2 bg-gradient-to-b from-slate-800 to-slate-900 border border-slate-700/50 rounded-xl shadow-2xl backdrop-blur-xl z-50 overflow-hidden">
-            {options.map((option) => (
-              <button
-                key={option}
-                onClick={() => {
-                  onChange(option);
-                  setIsOpen(false);
-                }}
-                type="button"
-                className={`w-full px-4 py-3 text-left text-sm font-medium transition-all duration-200 ${
-                  value === option
-                    ? 'bg-cyan-500/20 text-cyan-300 border-l-2 border-l-cyan-500'
-                    : 'text-slate-300 hover:bg-white/10 hover:text-white'
-                }`}
-              >
-                {option}
-              </button>
-            ))}
-          </div>
-        )}
-      </div>
-    </div>
-  );
-}
-
-interface DataFlow {
-  id: string;
-  name: string;
-  description: string;
-  source_type: string;
-  destination_type: string;
-  status: string;
-  encryption_enabled: boolean;
-  created_at: string;
-}
+const STATUS_FILTERS = [{ value: '', label: 'All statuses' }, ...Object.entries(STATUS_LABELS).map(([value, label]) => ({ value, label }))];
+const SOURCE_FILTERS = [{ value: '', label: 'All sources' }, ...SOURCE_TYPES.map((s) => ({ value: s, label: s }))];
 
 export default function DashboardPage() {
   const router = useRouter();
-  const [flows, setFlows] = useState<DataFlow[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [allFlows, setAllFlows] = useState<DataFlow[] | null>(null);
+  const [flows, setFlows] = useState<DataFlow[] | null>(null);
   const [error, setError] = useState('');
+  const [search, setSearch] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
+  const [status, setStatus] = useState('');
+  const [source, setSource] = useState('');
+  const filtering = !!(status || source || debouncedSearch);
 
   useEffect(() => {
-    const fetchFlows = async () => {
-      try {
-        const token = localStorage.getItem('access_token');
-        if (!token) {
-          router.push('/login');
-          return;
-        }
-
-        const response = await fetch('http://localhost:8000/api/data-flows', {
-          headers: { 'Authorization': `Bearer ${token}` },
-        });
-
-        if (response.status === 401) {
-          localStorage.removeItem('access_token');
-          router.push('/login');
-          return;
-        }
-
-        if (!response.ok) {
-          throw new Error('Failed to fetch data flows');
-        }
-
-        const data = await response.json();
-        setFlows(data);
-      } catch (err) {
-        setError(err instanceof Error ? err.message : 'Failed to load data flows');
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchFlows();
+    if (!hasSession()) {
+      router.replace('/login');
+      return;
+    }
+    api<DataFlow[]>('/api/data-flows/').then(setAllFlows).catch((err) => {
+      if (err instanceof AuthRequiredError) router.replace('/login');
+      else setError(err.message);
+    });
   }, [router]);
 
-  const handleLogout = () => {
-    localStorage.removeItem('access_token');
-    localStorage.removeItem('refresh_token');
-    router.push('/login');
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedSearch(search.trim()), 250);
+    return () => clearTimeout(t);
+  }, [search]);
+
+  useEffect(() => {
+    if (!filtering) {
+      setFlows(allFlows);
+      return;
+    }
+    const params = new URLSearchParams();
+    if (status) params.set('status', status);
+    if (source) params.set('source_type', source);
+    if (debouncedSearch) params.set('search', debouncedSearch);
+    api<DataFlow[]>(`/api/data-flows/?${params}`).then(setFlows).catch((err) => {
+      if (err instanceof AuthRequiredError) router.replace('/login');
+      else setError(err.message);
+    });
+  }, [status, source, debouncedSearch, filtering, allFlows, router]);
+
+  const counts = useMemo(() => {
+    const c = { total: allFlows?.length ?? 0, active: 0, draft: 0, paused: 0, archived: 0 };
+    allFlows?.forEach((f) => (c[f.status] += 1));
+    return c;
+  }, [allFlows]);
+
+  const clearFilters = () => {
+    setSearch('');
+    setStatus('');
+    setSource('');
   };
 
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'active':
-        return 'bg-green-500/10 text-green-400 border border-green-500/30';
-      case 'draft':
-        return 'bg-yellow-500/10 text-yellow-400 border border-yellow-500/30';
-      case 'paused':
-        return 'bg-blue-500/10 text-blue-400 border border-blue-500/30';
-      default:
-        return 'bg-slate-500/10 text-slate-400 border border-slate-500/30';
-    }
-  };
+  const loading = allFlows === null && !error;
+  const noFlowsAtAll = allFlows !== null && allFlows.length === 0;
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-950 to-black">
-      {/* Header */}
-      <header className="sticky top-0 z-40 backdrop-blur-xl border-b border-slate-700/50">
-        <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-cyan-400 to-blue-500 flex items-center justify-center">
-              <Shield className="w-6 h-6 text-white" />
-            </div>
-            <h1 className="text-2xl font-bold text-white">Secure Flow</h1>
-          </div>
-          <div className="flex items-center gap-4">
-            <button onClick={() => router.push('/dashboard/create')} className="inline-flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-cyan-500 to-blue-500 hover:from-cyan-600 hover:to-blue-600 text-white font-semibold rounded-lg transition-all duration-300 shadow-lg hover:shadow-cyan-500/30">
-              <Plus className="w-5 h-5" />
-              New Flow
-            </button>
-            <button onClick={handleLogout} className="inline-flex items-center gap-2 px-4 py-2 bg-slate-800 hover:bg-slate-700 text-white font-semibold rounded-lg transition-all duration-300 border border-slate-600 hover:border-slate-500">
-              <LogOut className="w-5 h-5" />
-              Logout
-            </button>
-          </div>
-        </div>
-      </header>
+    <AppShell>
+      <PageHeader
+        title="Data flows"
+        description="Pipelines that move data from a source into a destination, with validation and per-user access control."
+        actions={
+          <Link href="/dashboard/create" className={buttonClass('primary')}>
+            <Plus className="h-4 w-4" />
+            New flow
+          </Link>
+        }
+      />
 
-      {/* Main Content */}
-      <main className="max-w-7xl mx-auto px-6 py-12">
-        {error && (
-          <div className="mb-8 p-4 rounded-xl bg-red-500/10 border border-red-500/30 backdrop-blur-sm">
-            <p className="text-red-300">{error}</p>
-          </div>
-        )}
+      {error && <div className="mb-6"><Notice tone="error">{error}</Notice></div>}
 
-        {loading ? (
-          <div className="flex items-center justify-center py-20">
-            <div className="text-center">
-              <div className="w-12 h-12 rounded-full border-2 border-slate-600 border-t-cyan-400 animate-spin mx-auto mb-4"></div>
-              <p className="text-slate-400 text-lg">Loading data flows...</p>
-            </div>
+      {noFlowsAtAll ? (
+        <Card>
+          <EmptyState
+            icon={Workflow}
+            title="No data flows yet"
+            description="Create a flow to connect a RESO feed or another source, validate the records and store them securely."
+            action={
+              <Link href="/dashboard/create" className={buttonClass('primary')}>
+                Create your first flow
+                <ArrowRight className="h-4 w-4" />
+              </Link>
+            }
+          />
+        </Card>
+      ) : (
+        <>
+          <div className="mb-6 grid grid-cols-2 gap-3 lg:grid-cols-4" data-testid="flow-stats">
+            <Stat label="Total flows" value={loading ? '–' : counts.total} />
+            <Stat label="Active" value={loading ? '–' : counts.active} tone={counts.active ? 'good' : 'default'} hint="Ready to ingest" />
+            <Stat label="Draft" value={loading ? '–' : counts.draft} hint="Not yet activated" />
+            <Stat label="Paused / archived" value={loading ? '–' : counts.paused + counts.archived} />
           </div>
-        ) : flows.length === 0 ? (
-          <div className="text-center py-20">
-            <div className="inline-flex items-center justify-center w-20 h-20 rounded-2xl bg-gradient-to-br from-cyan-500/20 to-blue-500/20 border border-cyan-500/30 mb-6 mx-auto">
-              <Zap className="w-10 h-10 text-cyan-400" />
-            </div>
-            <h2 className="text-3xl font-bold text-white mb-3">No data flows yet</h2>
-            <p className="text-slate-400 text-lg mb-8 max-w-md mx-auto">
-              Create your first secure data flow to get started. Configure sources, destinations, and encryption settings.
-            </p>
-            <button onClick={() => router.push('/dashboard/create')} className="inline-flex items-center gap-2 px-8 py-4 bg-gradient-to-r from-cyan-500 to-blue-500 hover:from-cyan-600 hover:to-blue-600 text-white font-semibold rounded-xl transition-all duration-300 shadow-lg hover:shadow-cyan-500/30 text-lg">
-              Create Your First Flow
-              <ArrowRight className="w-5 h-5" />
-            </button>
-          </div>
-        ) : (
-          <div className="space-y-6">
-            <div className="flex items-center justify-between mb-8">
-              <div>
-                <h2 className="text-2xl font-bold text-white">Your Data Flows</h2>
-                <p className="text-slate-400 mt-1">{flows.length} active flow{flows.length !== 1 ? 's' : ''}</p>
+
+          <Card padded={false}>
+            <div className="flex flex-col gap-3 border-b border-slate-800 p-4 md:flex-row md:items-center">
+              <div className="relative flex-1">
+                <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" />
+                <input
+                  type="search"
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  placeholder="Search by name"
+                  aria-label="Search flows"
+                  className="block h-9 w-full rounded-lg border border-slate-700 bg-slate-950/60 pl-9 pr-3 text-sm text-slate-100 placeholder:text-slate-500 outline-none transition-colors hover:border-slate-600 focus:border-sky-500 focus:ring-2 focus:ring-sky-500/20"
+                />
               </div>
+              <CustomDropdown className="md:w-44" value={status} onChange={setStatus} options={STATUS_FILTERS} ariaLabel="Filter by status" />
+              <CustomDropdown className="md:w-44" value={source} onChange={setSource} options={SOURCE_FILTERS} ariaLabel="Filter by source" />
             </div>
 
-            <div className="grid gap-6">
-              {flows.map((flow) => (
-                <div key={flow.id} className="backdrop-blur-xl bg-white/5 border border-slate-700/50 rounded-xl p-6 hover:bg-white/10 hover:border-slate-600/50 transition-all duration-300 group">
-                  <div className="flex items-start justify-between mb-4">
-                    <div className="flex-1">
-                      <h3 className="text-xl font-bold text-white group-hover:text-cyan-300 transition-colors">{flow.name}</h3>
-                      <p className="text-slate-400 text-sm mt-1">{flow.description}</p>
-                    </div>
-                    <span className={`px-3 py-1 rounded-lg text-sm font-semibold ${getStatusColor(flow.status)} capitalize`}>
-                      {flow.status}
-                    </span>
-                  </div>
-
-                  <div className="flex items-center gap-4 mb-6 py-4 border-t border-b border-slate-700/50">
-                    <div className="flex-1 flex items-center gap-3">
-                      <div className="px-3 py-2 rounded-lg bg-slate-800/50 border border-slate-700/50">
-                        <p className="text-xs text-slate-400 uppercase tracking-wider font-semibold">{flow.source_type}</p>
-                      </div>
-                      <ArrowRight className="w-5 h-5 text-slate-600" />
-                      <div className="px-3 py-2 rounded-lg bg-slate-800/50 border border-slate-700/50">
-                        <p className="text-xs text-slate-400 uppercase tracking-wider font-semibold">{flow.destination_type}</p>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-6">
-                      <div>
-                        <p className="text-xs text-slate-500 uppercase tracking-widest">Encryption</p>
-                        <p className={`font-semibold mt-1 ${flow.encryption_enabled ? 'text-green-400' : 'text-red-400'}`}>
-                          {flow.encryption_enabled ? '✓ Enabled' : '✗ Disabled'}
-                        </p>
-                      </div>
-                      <div>
-                        <p className="text-xs text-slate-500 uppercase tracking-widest">Created</p>
-                        <p className="text-slate-300 font-semibold mt-1">{new Date(flow.created_at).toLocaleDateString()}</p>
-                      </div>
-                    </div>
-                    <Link
-                      href={`/dashboard/${flow.id}`}
-                      className="px-6 py-2 bg-slate-800 hover:bg-slate-700 text-white font-semibold rounded-lg transition-all duration-300 border border-slate-600 hover:border-slate-500 flex items-center gap-2"
-                    >
-                      Edit
-                      <ArrowRight className="w-4 h-4" />
-                    </Link>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-      </main>
-
-    </div>
+            {loading || flows === null ? (
+              <div className="space-y-3 p-4">
+                {[0, 1, 2].map((i) => <Skeleton key={i} className="h-12 w-full" />)}
+              </div>
+            ) : flows.length === 0 ? (
+              <EmptyState
+                icon={Search}
+                title="No flows match these filters"
+                description="Try a different search term or clear the filters."
+                action={<button onClick={clearFilters} className={buttonClass('secondary', 'sm')}>Clear filters</button>}
+              />
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b border-slate-800 text-left text-xs font-medium text-slate-400">
+                      <th className="px-4 py-3 font-medium">Name</th>
+                      <th className="px-4 py-3 font-medium">Status</th>
+                      <th className="px-4 py-3 font-medium">Pipeline</th>
+                      <th className="px-4 py-3 font-medium">Encryption</th>
+                      <th className="px-4 py-3 font-medium">Updated</th>
+                      <th className="w-10 px-4 py-3"><span className="sr-only">Open</span></th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-800/70">
+                    {flows.map((flow) => (
+                      <tr
+                        key={flow.id}
+                        onClick={() => router.push(`/dashboard/${flow.id}`)}
+                        className="group cursor-pointer transition-colors hover:bg-slate-800/40"
+                      >
+                        <td className="px-4 py-3.5">
+                          <Link href={`/dashboard/${flow.id}`} onClick={(e) => e.stopPropagation()} className="font-medium text-slate-100 group-hover:text-white hover:underline">
+                            {flow.name}
+                          </Link>
+                          {flow.description && <p className="mt-0.5 max-w-md truncate text-xs text-slate-500">{flow.description}</p>}
+                        </td>
+                        <td className="px-4 py-3.5"><StatusBadge status={flow.status} /></td>
+                        <td className="px-4 py-3.5">
+                          <div className="flex items-center gap-2 whitespace-nowrap">
+                            <Tag>{flow.source_type}</Tag>
+                            <ArrowRight className="h-3.5 w-3.5 text-slate-600" />
+                            <Tag>{flow.destination_type}</Tag>
+                          </div>
+                        </td>
+                        <td className="px-4 py-3.5">
+                          {flow.encryption_enabled ? (
+                            <span className="inline-flex items-center gap-1.5 text-slate-300"><Lock className="h-3.5 w-3.5 text-emerald-400" />Enabled</span>
+                          ) : (
+                            <span className="inline-flex items-center gap-1.5 text-slate-400"><Unlock className="h-3.5 w-3.5 text-amber-400" />Off</span>
+                          )}
+                        </td>
+                        <td className="whitespace-nowrap px-4 py-3.5 text-slate-400" title={parseUtc(flow.updated_at).toLocaleString()}>
+                          {relativeTime(parseUtc(flow.updated_at))}
+                        </td>
+                        <td className="px-4 py-3.5 text-slate-600 group-hover:text-slate-300"><ChevronRight className="h-4 w-4" /></td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+            {flows && flows.length > 0 && (
+              <div className="border-t border-slate-800 px-4 py-3 text-xs text-slate-500" data-testid="flow-summary">
+                {filtering ? `${flows.length} of ${counts.total} flows match` : `${counts.total} flow${counts.total !== 1 ? 's' : ''}`}
+                {filtering && <button onClick={clearFilters} className="ml-3 text-sky-400 hover:text-sky-300">Clear filters</button>}
+              </div>
+            )}
+          </Card>
+        </>
+      )}
+    </AppShell>
   );
 }
