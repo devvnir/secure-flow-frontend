@@ -6,9 +6,11 @@ import { usePathname, useRouter } from 'next/navigation';
 import { ChevronDown, LogOut, Plus, Shield } from 'lucide-react';
 import { api, logout, type CurrentUser } from '@/lib/api';
 import { buttonClass, cx, useClickOutside } from '@/components/ui';
+import { useVault } from '@/components/VaultProvider';
 
 const NAV = [
   { href: '/dashboard', label: 'Flows' },
+  { href: '/vault', label: 'Vault' },
   { href: '/tools', label: 'Schema Tools' },
 ];
 
@@ -20,6 +22,7 @@ export default function AppHeader() {
   const [signingOut, setSigningOut] = useState(false);
   const closeMenu = useCallback(() => setMenuOpen(false), []);
   const menuRef = useClickOutside<HTMLDivElement>(closeMenu);
+  const { lock: lockVault } = useVault();
 
   useEffect(() => {
     api<CurrentUser>('/api/auth/me').then(setUser).catch(() => undefined);
@@ -27,6 +30,7 @@ export default function AppHeader() {
 
   const handleLogout = async () => {
     setSigningOut(true);
+    lockVault();
     await logout();
     router.replace('/login');
   };

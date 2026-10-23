@@ -53,6 +53,10 @@ const STATUS_STYLES: Record<string, { dot: string; text: string; ring: string; l
   running: { dot: 'bg-sky-400 animate-pulse', text: 'text-sky-300', ring: 'bg-sky-500/10 ring-sky-500/25', label: 'Running' },
   archived: { dot: 'bg-slate-500', text: 'text-slate-400', ring: 'bg-slate-500/10 ring-slate-600/30', label: 'Archived' },
   failed: { dot: 'bg-red-400', text: 'text-red-300', ring: 'bg-red-500/10 ring-red-500/25', label: 'Failed' },
+  clean: { dot: 'bg-emerald-400', text: 'text-emerald-300', ring: 'bg-emerald-500/10 ring-emerald-500/25', label: 'Clean' },
+  sanitized: { dot: 'bg-sky-400', text: 'text-sky-300', ring: 'bg-sky-500/10 ring-sky-500/25', label: 'Sanitized' },
+  rejected: { dot: 'bg-red-400', text: 'text-red-300', ring: 'bg-red-500/10 ring-red-500/25', label: 'Rejected' },
+  error: { dot: 'bg-red-400', text: 'text-red-300', ring: 'bg-red-500/10 ring-red-500/25', label: 'Error' },
 };
 
 export function StatusBadge({ status, testId }: { status: string; testId?: string }) {
@@ -340,6 +344,35 @@ export function ConfirmDialog({
           <Button onClick={onCancel} disabled={busy}>Cancel</Button>
           <Button variant={danger ? 'danger' : 'primary'} onClick={onConfirm} loading={busy}>{confirmLabel}</Button>
         </div>
+      </div>
+    </div>
+  );
+}
+
+export function Modal({ open, title, onClose, children, wide }: { open: boolean; title: React.ReactNode; onClose: () => void; children: React.ReactNode; wide?: boolean }) {
+  useEffect(() => {
+    if (!open) return;
+    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && onClose();
+    window.addEventListener('keydown', onKey);
+    document.body.style.overflow = 'hidden';
+    return () => {
+      window.removeEventListener('keydown', onKey);
+      document.body.style.overflow = '';
+    };
+  }, [open, onClose]);
+
+  if (!open) return null;
+  return (
+    <div className="fixed inset-0 z-[60] flex items-start justify-center overflow-y-auto p-4 sm:p-8">
+      <div className="fixed inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
+      <div role="dialog" aria-modal="true" aria-label={typeof title === 'string' ? title : undefined} className={cx('relative w-full rounded-xl border border-slate-700 bg-slate-900 shadow-2xl', wide ? 'max-w-4xl' : 'max-w-lg')}>
+        <div className="flex items-center justify-between gap-4 border-b border-slate-800 px-5 py-4">
+          <h2 className="text-base font-semibold text-white">{title}</h2>
+          <button type="button" aria-label="Close" onClick={onClose} className="rounded-md p-1 text-slate-400 hover:bg-slate-800 hover:text-white">
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+        <div className="p-5">{children}</div>
       </div>
     </div>
   );
