@@ -1,0 +1,13 @@
+{
+  "compilerOptions": {
+    "target": "ES2019",
+    "lib": ["ES2019", "DOM", "DOM.Iterable"],
+    "strict": true,
+    "noEmitOnError": true,
+    "types": [],
+    "removeComments": false,
+    "outDir": "../public/overlay",
+    "rootDir": "src"
+  },
+  "include": ["src/*.ts"]
+}

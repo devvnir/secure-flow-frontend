@@ -1,0 +1,42 @@
+{
+  "version": 1,
+  "overlay": {
+    "id": "broker-documents",
+    "title": "Secure Flow",
+    "subtitle": "Broker document status · {{portalName}}",
+    "allowedDomains": ["localhost"],
+    "position": "bottom-right",
+    "theme": { "accent": "#0ea5e9", "radius": 12 },
+    "statusField": "Document_Status_Bit",
+    "statusMap": {
+      "0": { "label": "Pending", "tone": "warning", "description": "Waiting for documents" },
+      "1": { "label": "Submitted", "tone": "info", "description": "Ready for signature" },
+      "2": { "label": "Active", "tone": "success", "description": "Signed and active" }
+    },
+    "record": [
+      { "type": "row", "children": [
+        { "type": "heading", "text": "{{Display_Name}}" },
+        { "type": "status", "bind": "Document_Status_Bit" }
+      ] },
+      { "type": "field", "label": "Broker ID", "bind": "Broker_ID", "mono": true },
+      { "type": "field", "label": "Region node", "bind": "Region_Node", "mono": true },
+      { "type": "steps", "bind": "Document_Status_Bit" },
+      { "type": "text", "text": "Upload the listing agreement to continue.", "muted": true, "when": { "Document_Status_Bit": [0] } },
+      { "type": "action", "label": "Review and sign", "href": "{{signUrl}}?doc={{Broker_ID}}", "when": { "Document_Status_Bit": [1] } },
+      { "type": "text", "text": "All documents signed.", "muted": true, "when": { "Document_Status_Bit": [2] } }
+    ]
+  },
+  "context": {
+    "portalName": "Mock broker portal",
+    "signUrl": "http://localhost:3000/sign"
+  },
+  "users": [
+    { "Broker_ID": "BRK-1042", "Region_Node": "us-west.sf-bay", "Document_Status_Bit": 0, "Display_Name": "Ava Thompson" },
+    { "Broker_ID": "BRK-2177", "Region_Node": "us-east.nyc-01", "Document_Status_Bit": 1, "Display_Name": "Marcus Lee" },
+    { "Broker_ID": "BRK-3305", "Region_Node": "eu-central.fra", "Document_Status_Bit": 2, "Display_Name": "Sofia Becker" },
+    { "Broker_ID": "BRK-4410", "Region_Node": "us-west.la-02", "Document_Status_Bit": 1, "Display_Name": "<img src=x onerror=\"window.__sfXss=1\">Injected Name" },
+    { "Broker_ID": "bad id!", "Region_Node": "us-west.sf-bay", "Document_Status_Bit": 0 },
+    { "Broker_ID": "BRK-5521", "Region_Node": "us-east.bos", "Document_Status_Bit": 7 },
+    { "Broker_ID": "BRK-6630", "Document_Status_Bit": "1" }
+  ]
+}

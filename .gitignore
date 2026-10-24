@@ -18,3 +18,9 @@ next-env.d.ts
 npm-debug.log*
 .DS_Store
 Thumbs.db
+
+# Compiled overlay engine (npm run build:overlay)
+public/overlay/*.js
+
+# Overlay validation output
+overlay/proxy/output/

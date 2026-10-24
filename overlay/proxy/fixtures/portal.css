@@ -1,0 +1,6 @@
+/* Deliberately aggressive host styles: none of this may reach the overlay's Shadow DOM. */
+* { color: #ff0000 !important; font-family: "Times New Roman", serif !important; }
+div, article, span, a { background: #ff69b4 !important; border-radius: 0 !important; }
+a { text-decoration: underline wavy !important; }
+body { margin: 24px; }
+.portal-header { font-size: 20px; font-weight: bold; margin-bottom: 16px; }

@@ -12,6 +12,9 @@ const NAV = [
   { href: '/dashboard', label: 'Flows' },
   { href: '/vault', label: 'Vault' },
   { href: '/tools', label: 'Schema Tools' },
+  { href: '/overlay', label: 'Overlay' },
+  { href: '/sign', label: 'Signatures' },
+  { href: '/billing', label: 'Billing' },
 ];
 
 export default function AppHeader() {
@@ -48,7 +51,7 @@ export default function AppHeader() {
             </span>
             <span className="hidden sm:inline text-sm font-semibold tracking-tight text-white">Secure Flow</span>
           </Link>
-          <nav className="flex items-center gap-1 text-sm">
+          <nav className="flex items-center gap-1 overflow-x-auto text-sm">
             {NAV.map((item) => (
               <Link
                 key={item.href}

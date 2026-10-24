@@ -87,7 +87,7 @@ async function refreshTokens(): Promise<boolean> {
   return refreshing;
 }
 
-export async function api<T = unknown>(path: string, init: RequestInit = {}, retried = false): Promise<T> {
+async function authorizedFetch(path: string, init: RequestInit, retried = false): Promise<Response> {
   const token = localStorage.getItem(ACCESS);
   if (!token) throw new AuthRequiredError();
 
@@ -101,14 +101,25 @@ export async function api<T = unknown>(path: string, init: RequestInit = {}, ret
   });
 
   if (res.status === 401 && !retried) {
-    if (await refreshTokens()) return api<T>(path, init, true);
+    if (await refreshTokens()) return authorizedFetch(path, init, true);
     clearTokens();
     throw new AuthRequiredError();
   }
+  return res;
+}
 
+export async function api<T = unknown>(path: string, init: RequestInit = {}): Promise<T> {
+  const res = await authorizedFetch(path, init);
   const body = res.status === 204 ? null : await res.json().catch(() => null);
   if (!res.ok) throw new ApiError(errorMessage(body, res.status), res.status);
   return body as T;
+}
+
+/** For non-JSON responses such as the signature SVG. */
+export async function apiText(path: string): Promise<string> {
+  const res = await authorizedFetch(path, {});
+  if (!res.ok) throw new ApiError(errorMessage(await res.json().catch(() => null), res.status), res.status);
+  return res.text();
 }
 
 export async function publicPost<T = unknown>(path: string, payload: unknown): Promise<T> {
