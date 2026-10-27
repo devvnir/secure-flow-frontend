@@ -84,6 +84,8 @@ export default function OverlayPage() {
       .then(([eng, payload]) => {
         if (disposed) return;
         engine.current = eng;
+        // The mock payload links to a local dev server; point it at the deployment serving this page.
+        payload = payload.replace('"http://localhost:3000/sign"', JSON.stringify(`${window.location.origin}/sign`));
         original.current = payload;
         setSource(payload);
         compile(payload);
