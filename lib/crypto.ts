@@ -28,6 +28,7 @@ export function fromB64(value: string): Bytes {
 const randomBytes = (n: number): Bytes => crypto.getRandomValues(new Uint8Array(new ArrayBuffer(n)));
 
 export interface VaultConfig {
+  configured?: true;
   kdf: 'PBKDF2-SHA256';
   iterations: number;
   salt: string;

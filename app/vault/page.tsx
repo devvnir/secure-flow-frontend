@@ -115,12 +115,15 @@ export default function VaultPage() {
 
   const loadConfig = useCallback(async () => {
     try {
-      const cfg = await api<VaultConfig>('/api/vault');
+      const cfg = await api<VaultConfig | { configured: false }>('/api/vault');
+      if (cfg.configured === false) {
+        setPhase('setup');
+        return;
+      }
       setConfig(cfg);
       setPhase(vaultKey ? 'unlocked' : 'locked');
     } catch (err) {
-      if (err instanceof ApiError && err.status === 404) setPhase('setup');
-      else fail(err, setPageError);
+      fail(err, setPageError);
     }
   }, [vaultKey, fail]);
 
